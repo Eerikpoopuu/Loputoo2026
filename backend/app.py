@@ -42,7 +42,11 @@ def register():
         return jsonify({"error": "Email ja parool on kohustuslik"}), 400
 
     try:
-        user_resp = supabase.auth.sign_up({"email": email, "password": password})
+        user_resp = supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {"email_redirect_to": os.environ.get("VITE_API_BASE_URL", "http://localhost:8080")},
+        })
         auth_user = user_resp.user
     except Exception as e:
         return jsonify({"error": str(e)}), 400
