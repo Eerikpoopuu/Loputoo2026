@@ -26,6 +26,13 @@ jobs:
       - run:
           name: Run backend tests
           command: pytest tests/
+          environment:
+            ENCRYPTION_KEY: "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE="
+            JWT_SECRET_KEY: "test-secret-key-for-ci-only"
+            SECRET_KEY: "test-secret"
+            SUPABASE_URL: "https://placeholder.supabase.co"
+            SUPABASE_KEY: "placeholder"
+            STRIPE_SECRET_KEY: "sk_test_placeholder"
 
 workflows:
   version: 2

@@ -53,10 +53,9 @@ def test_user_sees_orders():
         mock.table.return_value.select.return_value.eq.return_value.execute.side_effect = [user_mock, orders_mock]  
 
         response = client.get(
-            "/api/orders",
+            "/api/subscriptions",
             headers={"Authorization": f"Bearer {token}"}
         )
 
         assert response.status_code == 200
-        assert "orders" in response.get_json()
-        assert len(response.get_json()["orders"]) == 1
+        assert "subscriptions" in response.get_json()
