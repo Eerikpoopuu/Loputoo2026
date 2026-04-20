@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./hooks/use-auth";
 import Profile from "./pages/Profile";
+import { GoogleAuthHandler } from "./components/GoogleAuthHandler";
 
 const queryClient = new QueryClient();
 
@@ -16,13 +17,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="*" element={<NotFound />} />
-          <Route path="/profile" element={<Profile/>} />
-        </Routes>
-      </BrowserRouter>
+        <GoogleAuthHandler />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="*" element={<NotFound />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

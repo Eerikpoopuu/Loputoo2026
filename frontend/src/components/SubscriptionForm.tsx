@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { submitSubscription, type SubscriptionOrderData } from "@/lib/api";
+import { createStripeCheckout, type SubscriptionOrderData } from "@/lib/api";
 import { Check, Flower2, Loader2, Gift } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -34,10 +34,16 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const bouquetOptions = [
-  { value: "small" as const, label: "Väike", price: "19,90 €" },
-  { value: "medium" as const, label: "Keskmine", price: "29,90 €" },
-  { value: "large" as const, label: "Suur", price: "44,90 €" },
+  { value: "small" as const, label: "Väike", price: "19,00 €" },
+  { value: "medium" as const, label: "Keskmine", price: "29,00 €" },
+  { value: "large" as const, label: "Suur", price: "39,00 €" },
 ];
+
+const priceMap: Record<"small" | "medium" | "large", Record<"weekly" | "monthly", string>> = {
+  small:  { weekly: "price_1TN6epLuP39BUGmfTvn7J12E", monthly: "price_1T9kcZLuP39BUGmfbUITjNsP" },
+  medium: { weekly: "price_1TN6fbLuP39BUGmfo1REDXWW", monthly: "price_1T9kczLuP39BUGmf3hxAkHUI" },
+  large:  { weekly: "price_1TN6gGLuP39BUGmfQGmX35S4", monthly: "price_1T9kdHLuP39BUGmfhEPPHgbO" },
+};
 
 const periodOptions = [
   { value: "weekly" as const, label: "Iganädalane" },
@@ -57,8 +63,11 @@ export default function SubscriptionForm() {
     resolver: zodResolver(schema),
     defaultValues: { special_dates: [] },});
 
-  const selectedBouquet = watch("bouquet");
+  const selectedBouquetValue = watch("bouquet");
   const selectedPeriod = watch("period");
+  const priceId = selectedBouquetValue && selectedPeriod
+    ? priceMap[selectedBouquetValue][selectedPeriod]
+    : undefined;
   const selectedSpecialDates = watch("special_dates") || [];
 
   const toggleSpecialDate = (value: string) => {
@@ -71,13 +80,33 @@ export default function SubscriptionForm() {
   
 
   const onSubmit = async (data: FormData) => {
-    if (!isLoggedIn&& user) {
-      toast({title:"Logi sisse",
-        description:"Tellimuse esitamiseks pead sisse logima",
-        variant:"destructive",
+    if (!isLoggedIn || !user) {
+      toast({
+        title: "Logi sisse",
+        description: "Tellimuse esitamiseks pead sisse logima",
+        variant: "destructive",
       });
       return;
     }
+
+    if (!priceId) {
+      toast({
+        title: "Viga",
+        description: "Palun vali kimbu suurus",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!token) {
+      toast({
+        title: "Seanss aegunud",
+        description: "Palun logi uuesti sisse",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload: SubscriptionOrderData = {
@@ -88,24 +117,24 @@ export default function SubscriptionForm() {
         bouquet: data.bouquet,
         period: data.period,
         special_dates: data.special_dates,
-        user_id:user.id,
-        
       };
-      
-      console.log("Payload:", payload);
-      await submitSubscription(payload,token);
-      setIsSuccess(true);
+
+      const checkoutUrl = await createStripeCheckout(priceId, payload, token);
+
       toast({
-        title: "Tellimus edukalt esitatud!",
-        description: "Võtame teiega peagi ühendust.",
+        title: "Suuname maksma...",
+        description: "Kohe suunatakse sind Stripe makselehele.",
       });
+
+      setTimeout(() => {
+        window.location.href = checkoutUrl;
+      }, 800);
     } catch (error) {
       toast({
         title: "Viga",
         description: error instanceof Error ? error.message : "Midagi läks valesti. Palun proovi uuesti.",
         variant: "destructive",
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -185,7 +214,7 @@ export default function SubscriptionForm() {
                       type="button"
                       onClick={() => setValue("bouquet", opt.value, { shouldValidate: true })}
                       className={`rounded-lg border-2 p-4 text-center transition-all hover:border-primary/60 ${
-                        selectedBouquet === opt.value
+                        selectedBouquetValue === opt.value
                           ? "border-primary bg-primary/5 shadow-md"
                           : "border-border"
                       }`}

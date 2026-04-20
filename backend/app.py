@@ -1,17 +1,33 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory
+import json
+from flask import Flask, request, jsonify, send_from_directory,redirect, session,url_for
 from flask_jwt_extended import create_access_token, JWTManager, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import stripe
+from datetime import datetime, timezone, timedelta
+from cryptography.fernet import Fernet
 
 app = Flask(__name__, static_folder="static/dist")
-load_dotenv(".env.local")
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env.local"))
 app.secret_key = os.environ.get("SECRET_KEY")
 CORS(app)
 jwt = JWTManager(app)
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
 supabase: Client = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
+stripe.api_key=os.getenv('STRIPE_SECRET_KEY')
+encryption_key = os.getenv("ENCRYPTION_KEY")
+if not encryption_key:
+    raise RuntimeError("ENCRYPTION_KEY is not set in .env.local")
+fernet = Fernet(encryption_key)
+
+def encrypt(value: str) -> str:
+    return fernet.encrypt(value.encode()).decode()
+
+def decrypt(value: str) -> str:
+    return fernet.decrypt(value.encode()).decode()
+
 
 
 @app.route("/api/register", methods=["POST"])
@@ -39,7 +55,9 @@ def register():
             "last_name": last_name,
         }).execute()
     except Exception as e:
+        print(f"{e}")
         return jsonify({"error": "App_users insert failed: " + str(e)}), 500
+       
 
     return jsonify({
         "message": "Kasutaja loodud. Kontrolli oma e-posti!",
@@ -88,54 +106,214 @@ def login():
     }), 200
 
 
-@app.route("/api/orders", methods=["POST"])
-@jwt_required()
-def create_order():
-    user_email = get_jwt_identity()
+@app.route("/api/auth/google", methods=["POST"])
+def google_auth():
     data = request.get_json()
+    email = data.get("email")
+    if not email:
+        return jsonify({"error": "Email on kohustuslik"}), 400
 
-    required_fields = ["first_name", "last_name", "phone", "delivery_address", "bouquet", "period"]
-    for f in required_fields:
-        if f not in data:
-            return jsonify({"error": f"{f} on kohustuslik"}), 400
+    auth_uid = data.get("auth_uid")
+    first_name = data.get("first_name", "")
+    last_name = data.get("last_name", "")
+    user_resp = supabase.table("app_users").select("id").eq("email", email).execute()
+    if not user_resp.data:
+        try:
+            supabase.table("app_users").insert({
+                "email": email,
+                "auth_uid": auth_uid,
+                "first_name": first_name,
+                "last_name": last_name,
+            }).execute()
+        except Exception as e:
+            return jsonify({"error": "App_users insert failed: " + str(e)}), 500
 
-    # Leia kasutaja Supabase-st
+    access_token = create_access_token(identity=email)
+    return jsonify({"access_token": access_token}), 200
+
+
+@app.route("/api/profile", methods=["GET"])
+@jwt_required()
+def get_profile():
+    user_email = get_jwt_identity()
+    user_resp = supabase.table("app_users").select("id,first_name,last_name").eq("email", user_email).single().execute()
+    if not user_resp.data:
+        return jsonify({"error": "Kasutajat ei leitud"}), 404
+    return jsonify({"user": user_resp.data}), 200
+
+@app.route("/api/subscriptions", methods=["GET"])
+@jwt_required()
+def get_subscriptions():
+    user_email = get_jwt_identity()
     user_resp = supabase.table("app_users").select("id").eq("email", user_email).single().execute()
+
     if not user_resp.data:
         return jsonify({"error": "Kasutajat ei leitud"}), 404
 
     user_id = user_resp.data["id"]
 
-    # Loo tellimuse payload
-    order_payload = {
-        "user_id": user_id,
-        "first_name": data["first_name"],
-        "last_name": data["last_name"],
-        "phone": data["phone"],
-        "delivery_address": data["delivery_address"],
-        "bouquet": data["bouquet"],
-        "period": data["period"],
+    subscriptions_resp = supabase.table("subscriptions").select("id,first_name,last_name,phone,delivery_address,bouquet,period").eq("user_id", user_id).execute()
+
+    return jsonify({"subscriptions": subscriptions_resp.data}), 200
+
+    
+@app.route("/api/subscriptions/<string:subscription_id>", methods=["DELETE"])
+@jwt_required()
+def delete_subscription(subscription_id):
+    user_email = get_jwt_identity()
+    user_resp = supabase.table("app_users").select("id").eq("email", user_email).single().execute()
+    if not user_resp.data:
+        return jsonify({"error": "Kasutajat ei leitud"}), 404
+    user_id = user_resp.data["id"]
+    
+
+    sub_resp = supabase.table("subscriptions").select("stripe_subscription_id").eq("id",subscription_id).eq("user_id",user_id).execute()
+    stripe_subscription_id = sub_resp.data[0]["stripe_subscription_id"] if sub_resp.data else None
+    if stripe_subscription_id:
+        stripe.Subscription.delete(stripe_subscription_id)
+    supabase.table("subscriptions").delete().eq("id", subscription_id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Tellimus edukalt kustutatud"}), 200
+
+
+
+@app.route("/api/stripe-checkout", methods=["POST"])
+@jwt_required()
+def stripe_checkout():
+    user_email = get_jwt_identity()
+    data = request.get_json()
+    price_id = data.get("priceId")
+
+    if not price_id:
+        return jsonify({"error": "Price ID puudub"}), 400
+
+    required_fields = ["first_name", "last_name", "phone", "delivery_address", "bouquet", "period"]
+    for f in required_fields:
+        if not data.get(f):
+            return jsonify({"error": f"{f} on kohustuslik"}), 400
+
+    special_dates = data.get("special_dates", [])
+    special_dates_json = json.dumps(special_dates, ensure_ascii=False)
+
+    metadata = {
+        "user_email": user_email[:499],
+        "first_name": data["first_name"][:499],
+        "last_name": data["last_name"][:499],
+        "phone": data["phone"][:499],
+        "delivery_address": data["delivery_address"][:499],
+        "bouquet": data["bouquet"][:499],
+        "period": data["period"][:499],
+        "special_dates": special_dates_json[:499],
+        "price_id": price_id,
+        "start_date": data.get("start_date", "")[:499],
     }
 
-    order_resp = supabase.table("orders").insert(order_payload).execute()
-    if not order_resp.data:
-        return jsonify({"error": "Tellimuse salvestamine ebaõnnestus"}), 500
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{"price": price_id, "quantity": 1}],
+            mode="subscription",
+            subscription_data={},
+            success_url=url_for("stripe_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=url_for("stripe_cancel", _external=True),
+            metadata=metadata,
+        )
+        return jsonify({"url": session.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    order_id = order_resp.data[0]["id"]
+@app.route("/success")
+def stripe_success():
+    session_id = request.args.get("session_id")
 
-    # Lisa eripäevad, kui on
-    special_dates_values = data.get("special_dates", [])
-    for sd_value in special_dates_values:
-        # leia special_dates id
-        sd_resp = supabase.table("special_dates").select("id").eq("value", sd_value).single().execute()
-        if sd_resp.data:
-            supabase.table("order_special_dates").insert({
-                "order_id": order_id,
-                "special_date_id": sd_resp.data["id"]
-            }).execute()
+    if not session_id:
+        return redirect("/?payment=error")
 
-    return jsonify({"message": "Tellimus edukalt salvestatud", "order_id": order_id}), 201
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        print(f"ERROR: Stripe session retrieve failed: {e}")
+        return redirect("/?payment=error")
 
+    if session.payment_status != "paid":
+        print(f"Payment not completed. Status: {session.payment_status}, session: {session_id}")
+        return redirect("/?payment=cancelled")
+
+    meta = session.metadata or {}
+    user_email = meta.get("user_email")
+
+    if not user_email:
+        print(f"ERROR: No user_email in metadata for session {session_id}")
+        return redirect("/?payment=error")
+
+    try:
+        user_resp = supabase.table("app_users").select("id").eq("email", user_email).single().execute()
+    except Exception as e:
+        print(f"ERROR: Supabase user lookup failed for {user_email}: {e}")
+        return redirect("/?payment=error")
+    stripe_subscription_id = session.subscription
+    if not stripe_subscription_id:
+        print(f"ERROR: No stripe_subscription_id in session {session_id}")
+        return redirect("/?payment=error")
+
+    if not user_resp.data:
+        print(f"ERROR: User not found in app_users for email {user_email}, session {session_id}")
+        return redirect("/?payment=error")
+
+    user_id = user_resp.data["id"]
+
+    now = datetime.now(timezone.utc)
+    start_date = now.isoformat()
+    next_delivery_date = (now + timedelta(days=7)).isoformat()
+
+
+    subscription_resp = supabase.table("subscriptions").insert({
+        "user_id": user_id,
+        "first_name": meta.get("first_name", ""),
+        "last_name": meta.get("last_name", ""),
+        "phone": encrypt(meta.get("phone", "")),
+        "delivery_address": encrypt(meta.get("delivery_address", "")),
+        "bouquet": meta.get("bouquet", ""),
+        "price": meta.get("price_id", ""),
+        "stripe_subscription_id": stripe_subscription_id,
+        "stripe_session_id": session_id,
+        "start_date": start_date,
+        "next_delivery_date": next_delivery_date,
+        "period": meta.get("period", ""),
+    }).execute()
+
+    if not subscription_resp.data:
+        return redirect("/?payment=error")
+
+    subscription_id = subscription_resp.data[0]["id"]
+    return redirect("/?payment=success")
+
+@app.route("/api/stripe-webhook", methods=["POST"])
+def stripe_webhook():
+    event = request.get_json()
+    if event["type"] != "invoice.paid":
+        return jsonify({"status": "ignored"}), 200
+    invoice = event["data"]["object"]
+    stripe_subscription_id=invoice.get("subscription")
+    cutoff = datetime.fromtimestamp(invoice["lines"]["data"][0]["period"]["end"], tz=timezone.utc)                                                                                    
+    paid_at = datetime.fromtimestamp(invoice["status_transitions"]["paid_at"], tz=timezone.utc)                                                                                       
+    sub_resp=supabase.table("subscriptions").select("period").eq("stripe_subscription_id",stripe_subscription_id).single().execute()
+    period = sub_resp.data["period"]                                                                                                                 
+    interval = timedelta(days=7) if period == "weekly" else timedelta(days=30)
+                                                                                                                                                                                    
+    if paid_at <= cutoff:
+        next_delivery_date = cutoff
+    else:
+        next_delivery_date = cutoff + interval
+
+    supabase.table("subscriptions").update(
+        {"next_delivery_date": next_delivery_date.isoformat()}
+    ).eq("stripe_subscription_id", stripe_subscription_id).execute()
+
+    return jsonify({"status": "ok"}), 200
+    
+@app.route("/cancel")
+def stripe_cancel():
+    return redirect("/?payment=cancelled")
 
 # Serve React
 @app.route("/", defaults={"path": ""})

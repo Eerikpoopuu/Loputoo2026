@@ -1,8 +1,11 @@
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Flower, Flower2, Leaf } from "lucide-react";
 import SubscriptionForm from "@/components/SubscriptionForm";
 import { Header } from "@/components/Header";
+import { toast } from "@/hooks/use-toast";
 import heroBg from "@/assets/hero-bg.jpg";
 import bouquetSmall from "@/assets/bouquet-small.jpg";
 import bouquetMedium from "@/assets/bouquet-medium.jpg";
@@ -33,6 +36,33 @@ const bouquets = [
 ];
 
 export default function Index() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const payment = searchParams.get("payment");
+    if (payment === "success") {
+      toast({
+        title: "Tellimus edukalt esitatud!",
+        description: "Makse õnnestus ja tellimus on salvestatud.",
+      });
+      setSearchParams({});
+    } else if (payment === "cancelled") {
+      toast({
+        title: "Makse katkestatud",
+        description: "Tagasid makselt. Tellimust ei salvestatud.",
+        variant: "destructive",
+      });
+      setSearchParams({});
+    } else if (payment === "error") {
+      toast({
+        title: "Viga",
+        description: "Maksega tekkis probleem. Palun võta meiega ühendust.",
+        variant: "destructive",
+      });
+      setSearchParams({});
+    }
+  }, []);
+
   const scrollToForm = () => {
     document.getElementById("tellimus")?.scrollIntoView({ behavior: "smooth" });
   };
