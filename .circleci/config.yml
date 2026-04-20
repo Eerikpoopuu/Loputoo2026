@@ -25,7 +25,7 @@ jobs:
           command: pip install -r backend/requirements.txt
       - run:
           name: Run backend tests
-          command: cd backend && pytest
+          command: pytest tests/
 
 workflows:
   version: 2
