@@ -1,0 +1,25 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+    method: POST
+    uri: https://api.stripe.com/v1/checkout/sessions
+  response:
+    body:
+      string: '{"id":"cs_test_abc123","object":"checkout.session","cancel_url":"http://localhost/cancel","created":1703000000,"currency":null,"customer":null,"expires_at":1703086400,"livemode":false,"metadata":{"user_email":"test@example.com","first_name":"Test","last_name":"User","phone":"1234567890","delivery_address":"Test
+        Address","bouquet":"S","period":"weekly","special_dates":"[]","price_id":"price_test123","start_date":""},"mode":"subscription","payment_intent":null,"payment_method_types":["card"],"payment_status":"unpaid","status":"open","subscription":null,"success_url":"http://localhost/success?session_id={CHECKOUT_SESSION_ID}","url":"https://checkout.stripe.com/pay/cs_test_abc123"}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

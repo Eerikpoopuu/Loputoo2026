@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./hooks/use-auth";
 import Profile from "./pages/Profile";
 import { GoogleAuthHandler } from "./components/GoogleAuthHandler";
+import Adminpage from "./pages/Adminpage";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="*" element={<NotFound />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/admin" element={<Adminpage/>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

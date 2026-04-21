@@ -23,7 +23,7 @@ export function GoogleAuthHandler() {
 
           if (res.ok) {
             login(
-              { id: auth_uid, first_name: parts[0] || "", last_name: parts.slice(1).join(" ") || "" },
+              { id: auth_uid, first_name: parts[0] || "", last_name: parts.slice(1).join(" ") || "", role: data.role || "user" },
               data.access_token
             );
           }

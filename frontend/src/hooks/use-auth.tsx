@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
-type User = {id:string;first_name: string; last_name: string };
+type User = {id:string;first_name: string; last_name: string; role:string };
 type AuthContextType = {
   isLoggedIn: boolean;
   user: User | null;

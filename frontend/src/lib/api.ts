@@ -18,6 +18,8 @@ export interface Subscription {
   delivery_address: string;
   bouquet: "small" | "medium" | "large";
   period: "weekly" | "monthly";
+  next_delivery_date?: string;
+  user_id?: string;
 }
 export async function fetchSubscriptions(token: string): Promise<Subscription[]> {
   const response = await fetch(`${API_BASE_URL}/api/subscriptions`, {

@@ -31,14 +31,19 @@ export function Header() {
               >
                 {user.first_name}
               </Button>
-
+              {user.role === "admin" && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/admin")}
+                >
+                  Admin
+                </Button>
+              )}
               <Button
                 variant="destructive"
                 onClick={() => {
                   logout();
-                  navigate("/");
-                }}
-              >
+                  navigate("/"); }}>
                 Logi välja
               </Button>
             </>

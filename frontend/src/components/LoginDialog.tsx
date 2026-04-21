@@ -53,7 +53,7 @@ export function LoginDialog({ externalOpen, onExternalOpenChange }: { externalOp
 
       if (res.ok) {
         login(
-          { id: data.user_id, first_name: data.first_name, last_name: data.last_name },
+          { id: data.user_id, first_name: data.first_name, last_name: data.last_name, role:data.role },
           data.access_token
         );
         setFormData({ email: "", password: "" });
