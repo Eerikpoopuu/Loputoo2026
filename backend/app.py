@@ -22,6 +22,23 @@ if not encryption_key:
     raise RuntimeError("ENCRYPTION_KEY is not set in .env.local")
 fernet = Fernet(encryption_key)
 
+SPECIAL_DATE_MAP = {
+    "valentines": (2, 14),
+    "mothers_day": (5, 10),
+    "womens_day": (3, 8),
+    "christmas": (12, 24),
+}
+
+
+def next_occurrence(month: int, day: int, after: datetime) -> datetime:
+    try:
+        candidate = after.replace(month=month, day=day, hour=8, minute=0, second=0, microsecond=0)
+    except ValueError:
+        return after.replace(year=after.year + 1, month=month, day=day, hour=8, minute=0, second=0, microsecond=0)
+    if candidate <= after:
+        candidate = candidate.replace(year=candidate.year + 1)
+    return candidate
+
 
 def encrypt(value: str) -> str:
     return fernet.encrypt(value.encode()).decode()
@@ -297,6 +314,7 @@ def stripe_success():
         "start_date": start_date,
         "next_delivery_date": next_delivery_date,
         "period": meta.get("period", ""),
+        "special_dates": meta.get("special_dates", "[]"),
     }).execute()
 
     if not subscription_resp.data:
@@ -316,11 +334,18 @@ def stripe_webhook():
     cutoff = datetime.fromtimestamp(invoice["lines"]["data"][0]["period"]["end"], tz=timezone.utc)
     paid_at = datetime.fromtimestamp(invoice["status_transitions"]["paid_at"], tz=timezone.utc)
 
-    sub_resp = supabase.table("subscriptions").select("period").eq("stripe_subscription_id", stripe_subscription_id).single().execute()
+    sub_resp = supabase.table("subscriptions").select("period,special_dates").eq("stripe_subscription_id", stripe_subscription_id).single().execute()
     period = sub_resp.data["period"]
+    special_dates = json.loads(sub_resp.data.get("special_dates") or "[]")
     interval = timedelta(days=7) if period == "weekly" else timedelta(days=30)
 
-    next_delivery_date = cutoff if paid_at <= cutoff else cutoff + interval
+    next_regular = cutoff if paid_at <= cutoff else cutoff + interval
+    candidates = [next_regular]
+    for key in special_dates:
+        if key in SPECIAL_DATE_MAP:
+            m, d = SPECIAL_DATE_MAP[key]
+            candidates.append(next_occurrence(m, d, paid_at))
+    next_delivery_date = min(candidates)
 
     supabase.table("subscriptions").update(
         {"next_delivery_date": next_delivery_date.isoformat()}

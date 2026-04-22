@@ -39,18 +39,16 @@ def test_user_sees_orders():
 
     with app.app_context():
         token = create_access_token(identity="test@example.com")
-        
-    with patch("backend.app.supabase") as mock:
-        user_mock = MagicMock()
-        user_mock.data = {"id": 1}
-        
-        orders_mock = MagicMock()
-        orders_mock.data = [{"id": 1, "user_id": 1, "first_name": "Test",
-         "last_name": "User", "phone": "1234567890", "delivery_address": "Test Address",
-          "bouquet": "Test Bouquet", "period": "Test Period"}]
 
-    
-        mock.table.return_value.select.return_value.eq.return_value.execute.side_effect = [user_mock, orders_mock]  
+    with patch("backend.app.supabase") as mock, patch("backend.app.decrypt", side_effect=lambda x: x):
+        mock.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = MagicMock(
+            data={"id": 1, "role": "user"}
+        )
+        mock.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{"id": 1, "first_name": "Test", "last_name": "User",
+                   "phone": "1234567890", "delivery_address": "Test Address",
+                   "bouquet": "small", "period": "weekly", "next_delivery_date": "2026-04-28"}]
+        )
 
         response = client.get(
             "/api/subscriptions",
