@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { createStripeCheckout, type SubscriptionOrderData } from "@/lib/api";
 import { Check, Flower2, Loader2, Gift } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import GoogleAutocomplete from "react-google-autocomplete";
 
 
 
@@ -50,18 +50,22 @@ const periodOptions = [
   { value: "monthly" as const, label: "Igakuine" },
 ];
 
-export default function SubscriptionForm() {
+export default function SubscriptionForm({ preselectedBouquet }: { preselectedBouquet?: "small" | "medium" | "large" }) {
   const {isLoggedIn,user} =useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const token = localStorage.getItem("token");
 
-
-
   const {register,handleSubmit,watch,setValue,formState: { errors },} = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { special_dates: [] },});
+
+  useEffect(() => {
+    if (preselectedBouquet) {
+      setValue("bouquet", preselectedBouquet, { shouldValidate: true });
+    }
+  }, [preselectedBouquet]);
 
   const selectedBouquetValue = watch("bouquet");
   const selectedPeriod = watch("period");
@@ -109,9 +113,10 @@ export default function SubscriptionForm() {
 
     setIsSubmitting(true);
     try {
+      const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       const payload: SubscriptionOrderData = {
-        first_name: data.first_name,
-        last_name: data.last_name,
+        first_name: capitalize(data.first_name),
+        last_name: capitalize(data.last_name),
         phone: data.phone,
         delivery_address: data.delivery_address,
         bouquet: data.bouquet,
@@ -163,7 +168,7 @@ export default function SubscriptionForm() {
 
   return (
     <section id="tellimus" className="py-20 px-4">
-      <div className="container max-w-2xl mx-auto">
+      <div className="container max-w-3xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="font-display text-4xl font-bold text-foreground mb-3">Telli oma lilled</h2>
           <p className="text-muted-foreground text-lg">Täida allolev vorm ja me toome ilu sinu koju</p>
@@ -196,12 +201,21 @@ export default function SubscriptionForm() {
                   <Input id="phone" placeholder="+372 5123 4567" {...register("phone")} />
                   {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="delivery_address">Tarneaadress</Label>
-                <Textarea id="delivery_address" placeholder="Tänav 1, Linn, Postiindeks" {...register("delivery_address")} />
-                {errors.delivery_address && <p className="text-sm text-destructive">{errors.delivery_address.message}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="delivery_address">Tarneaadress</Label>
+                  <GoogleAutocomplete
+                    apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+                    onPlaceSelected={(place) => {
+                      setValue("delivery_address", place.formatted_address || "", { shouldValidate: true });
+                    }}
+                    options={{ types: ["address"], componentRestrictions: { country: "ee" } }}
+                    defaultValue=""
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                    placeholder="Tänav 1, Linn, Postiindeks"
+                    id="delivery_address"
+                />
+                  {errors.delivery_address && <p className="text-sm text-destructive">{errors.delivery_address.message}</p>}
+                </div>
               </div>
 
               {/* Bouquet selection */}

@@ -59,6 +59,8 @@ def register():
     if not email or not password:
         return jsonify({"error": "Email ja parool on kohustuslik"}), 400
 
+    success_response = jsonify({"message": "Kasutaja loodud. Kontrolli oma e-posti!"}), 201
+
     try:
         user_resp = supabase.auth.sign_up({
             "email": email,
@@ -67,7 +69,11 @@ def register():
         })
         auth_user = user_resp.user
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        print(f"Register sign_up error (not exposed): {e}")
+        return success_response
+
+    if not auth_user:
+        return success_response
 
     try:
         supabase.table("app_users").insert({
@@ -77,16 +83,9 @@ def register():
             "last_name": last_name,
         }).execute()
     except Exception as e:
-        print(f"{e}")
-        return jsonify({"error": "App_users insert failed: " + str(e)}), 500
+        print(f"Register app_users insert error (not exposed): {e}")
 
-    return jsonify({
-        "message": "Kasutaja loodud. Kontrolli oma e-posti!",
-        "user_id": auth_user.id,
-        "email": email,
-        "first_name": first_name,
-        "last_name": last_name,
-    }), 201
+    return success_response
 
 
 @app.route("/api/login", methods=["POST"])
@@ -113,8 +112,8 @@ def login():
         first_name = user_data_resp.data["first_name"]
         last_name = user_data_resp.data["last_name"]
         role = user_data_resp.data["role"]
-    except Exception as e:
-        return jsonify({"error": str(e)}), 401
+    except Exception:
+        return jsonify({"error": "Email või parool on vale"}), 401
 
     access_token = create_access_token(identity=email)
 

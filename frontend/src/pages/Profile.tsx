@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {Table,TableBody,TableCell,TableHead,TableHeader,TableRow,} from "@/components/ui/table";
-import {AlertDialog,AlertDialogAction,AlertDialogCancel,AlertDialogContent,AlertDialogDescription,AlertDialogFooter,AlertDialogHeader,AlertDialogTitle,} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { fetchSubscriptions, cancelSubscription, type Subscription } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X, Package, User, Mail } from "lucide-react";
+import { Loader2, X, Package } from "lucide-react";
 
 const bouquetLabels: Record<string, string> = {
   small: "Väike kimp",
@@ -80,29 +80,7 @@ export default function Profile() {
     <>
       <Header />
       <div className="min-h-screen bg-background pt-14">
-        <main className="container mx-auto max-w-4xl px-4 py-8 space-y-8">
-          {/* User info card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-3">
-              <User className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Kasutaja andmed</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <User className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {user.first_name} {user.last_name}
-                  </p>
-                </div>
-              </div>
-
-            </CardContent>
-          </Card>
-
-          {/* Orders */}
+        <main className="container mx-auto max-w-5xl px-4 py-8">
           <Card>
             <CardHeader className="flex flex-row items-center gap-3">
               <Package className="h-5 w-5 text-primary" />
@@ -114,28 +92,36 @@ export default function Profile() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : orders.length === 0 ? (
-                <p className="py-8 text-center text-muted-foreground">
-                  Tellimusi ei leitud.
-                </p>
+                <p className="py-8 text-center text-muted-foreground">Tellimusi ei leitud.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Eesnimi</TableHead>
+                        <TableHead>Perekonnanimi</TableHead>
+                        <TableHead>Telefon</TableHead>
+                        <TableHead>Tarneaadress</TableHead>
                         <TableHead>Kimp</TableHead>
                         <TableHead>Periood</TableHead>
-                        <TableHead>Tarneaadress</TableHead>
+                        <TableHead>Järgmine tarne</TableHead>
                         <TableHead className="text-right">Tegevus</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {orders.map((order) => (
                         <TableRow key={order.id}>
-                          <TableCell className="font-medium">
-                            {bouquetLabels[order.bouquet] || order.bouquet}
-                          </TableCell>
-                          <TableCell>{periodLabels[order.period] || order.period}</TableCell>
+                          <TableCell>{order.first_name}</TableCell>
+                          <TableCell>{order.last_name}</TableCell>
+                          <TableCell>{order.phone}</TableCell>
                           <TableCell>{order.delivery_address}</TableCell>
+                          <TableCell>{bouquetLabels[order.bouquet] || order.bouquet}</TableCell>
+                          <TableCell>{periodLabels[order.period] || order.period}</TableCell>
+                          <TableCell>
+                            {order.next_delivery_date
+                              ? new Date(order.next_delivery_date).toLocaleDateString("et-EE")
+                              : "—"}
+                          </TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
@@ -162,7 +148,6 @@ export default function Profile() {
         </main>
       </div>
 
-      {/* Cancel confirmation */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

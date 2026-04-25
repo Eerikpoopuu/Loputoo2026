@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['"Playfair Display"', 'serif'],
+        display: ['Oswald', 'sans-serif'],
         body: ['Lato', 'sans-serif'],
       },
       colors: {

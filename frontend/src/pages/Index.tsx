@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flower, Flower2, Leaf } from "lucide-react";
+import { Flower, Flower2, UserCheck, Package, Truck } from "lucide-react";
 import SubscriptionForm from "@/components/SubscriptionForm";
 import { Header } from "@/components/Header";
 import { toast } from "@/hooks/use-toast";
@@ -37,6 +37,12 @@ const bouquets = [
 
 export default function Index() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedBouquet, setSelectedBouquet] = useState<"small" | "medium" | "large" | undefined>();
+
+  const handleSelectBouquet = (value: "small" | "medium" | "large") => {
+    setSelectedBouquet(value);
+    document.getElementById("tellimus")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
     const payment = searchParams.get("payment");
@@ -85,7 +91,7 @@ export default function Index() {
           style={{ backgroundImage: `url(${heroBg})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background" />
-        <div className="relative container mx-auto px-4 py-28 md:py-40 text-center">
+        <div className="relative container mx-auto px-4 py-16 md:py-24 text-center">
           <Flower2 className="mx-auto mb-6 h-12 w-12 text-primary animate-float" />
           <h1 className="font-display text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight">
             Värsked lilled<br />iga nädal
@@ -102,11 +108,10 @@ export default function Index() {
 
       {/* Bouquet Cards Section */}
       <main>
-        <section className="py-20 px-4">
+        <section className="py-10 px-4">
           <div className="container mx-auto">
-            <div className="text-center mb-14">
+            <div className="text-center mb-10">
               <h2 className="font-display text-4xl font-bold text-foreground mb-3">Meie kimbud</h2>
-              <p className="text-muted-foreground text-lg">Vali endale sobiv suurus</p>
             </div>
             <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
               {bouquets.map((b) => (
@@ -125,7 +130,14 @@ export default function Index() {
                   <CardContent className="p-6 text-center">
                     <h3 className="font-display text-2xl font-semibold text-foreground mb-1">{b.title}</h3>
                     <p className="text-primary font-bold text-xl mb-3">{b.price}</p>
-                    <p className="text-muted-foreground text-sm">{b.description}</p>
+                    <p className="text-muted-foreground text-sm mb-4">{b.description}</p>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleSelectBouquet(b.value as "small" | "medium" | "large")}
+                    >
+                      Vali
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -133,30 +145,38 @@ export default function Index() {
           </div>
         </section>
 
-        {/* Period info */}
-        <section className="py-16 px-4 bg-secondary/40">
-          <div className="container mx-auto max-w-3xl text-center">
-            <Leaf className="mx-auto mb-4 h-8 w-8 text-accent" />
-            <h2 className="font-display text-3xl font-bold text-foreground mb-6">Kuidas see toimib?</h2>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="rounded-xl bg-card p-6 shadow-md">
-                <h3 className="font-display text-xl font-semibold text-foreground mb-2">Iganädalane tellimus</h3>
-                <p className="text-muted-foreground">
-                  Iga nädal uus kimp värskeid lilli otse sinu uksele. Ideaalne neile, kes armastavad pidevat ilu.
-                </p>
+        {/* How it works */}
+        <section className="py-14 px-4 bg-secondary/40">
+          <div className="container mx-auto max-w-4xl">
+            <h2 className="font-display text-3xl font-bold text-foreground text-center mb-10">Kuidas see toimib?</h2>
+            <div className="grid gap-8 sm:grid-cols-3">
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                  <UserCheck className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-foreground">1. Registreeru</h3>
+                <p className="text-muted-foreground text-sm">Loo konto e-mailiga või Google kontoga. Kiire ja lihtne.</p>
               </div>
-              <div className="rounded-xl bg-card p-6 shadow-md">
-                <h3 className="font-display text-xl font-semibold text-foreground mb-2">Igakuine tellimus</h3>
-                <p className="text-muted-foreground">
-                  Kord kuus eriline hooajaline kimp, mis kestab kaua ja toob rõõmu kogu kuuks.
-                </p>
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                  <Package className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-foreground">2. Vali kimp</h3>
+                <p className="text-muted-foreground text-sm">Vali sobiv suurus ja tarnekuupäev. Iganädalane või igakuine.</p>
+              </div>
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                  <Truck className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-foreground">3. Naudi</h3>
+                <p className="text-muted-foreground text-sm">Värsked lilled toimetatakse automaatselt otse sinu uksele.</p>
               </div>
             </div>
           </div>
         </section>
 
         {/* Subscription Form */}
-        <SubscriptionForm />
+        <SubscriptionForm preselectedBouquet={selectedBouquet} />
       </main>
 
       {/* Footer */}
