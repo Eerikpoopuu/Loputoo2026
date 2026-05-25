@@ -62,3 +62,4 @@ pytest
 ## Deployment
 
 Deployed to Heroku via CircleCI — every push to `main` runs tests and deploys automatically on success.
+https://loputoo2026-55c0d54c16d9.herokuapp.com/
